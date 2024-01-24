@@ -1,0 +1,25 @@
+# load data from csv file and create nodes with Horse lable
+LOAD CSV WITH HEADERS FROM 'file:///horses.csv' AS line FIELDTERMINATOR ';'
+CREATE (n: Horse{name: line.HorseName, gender: line.Gender, date_of_birth: line.Yearofbirth, ueln_code: line.Code, horse_breeder_code: line.Horsebreedercode, father: line.Father, mother: line.Mother})
+
+# create relations
+MATCH (h:Horse)
+        MATCH (f:Horse {name: h.father})
+        MATCH (m:Horse {name: h.mother})
+        MERGE (f)-[:FATHER]->(h)<-[:MOTHER]-(m)
+
+# load data from csv file and create nodes with Competition lable
+LOAD CSV WITH HEADERS FROM 'file:///competitions_results.csv' AS line FIELDTERMINATOR ';'
+CREATE (c: Competition{horsename: line.HorseName, class: toInteger(line.Class), number: toInteger(line.Number), judge1: toFloat(replace(line.J1, ',', '.')), judge2: toFloat(replace(line.J2, ',', '.')), judge3: toFloat(replace(line.J3, ',', '.')), year: toInteger(line.Year)})
+
+# add an 'avg_result' property to nodes with Competition lable
+match (c:Competition) set c.avg_result = (c.judge1 + c.judge2 + c.judge3) / 3
+
+# create relations
+match (h:Horse)
+match (c:Competition {horsename: h.name})
+merge (h)-[:COMPETITION_RESULT]->(c)
+return h, c
+
+# add an 'avg_result' property to nodes with Horse lable
+match (h:Horse)-[:COMPETITION_RESULT]-(c:Competition) where c.avg_result > 0 with h, avg(c.avg_result) as avg_result set h.avg_result = avg_result
